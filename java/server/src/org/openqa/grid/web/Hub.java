@@ -33,6 +33,7 @@ import org.openqa.grid.web.servlet.ProxyStatusServlet;
 import org.openqa.grid.web.servlet.RegistrationServlet;
 import org.openqa.grid.web.servlet.ResourceServlet;
 import org.openqa.grid.web.servlet.TestSessionStatusServlet;
+import org.openqa.grid.web.servlet.api.v1.APIEndpointRegistry;
 import org.openqa.grid.web.servlet.beta.ConsoleServlet;
 import org.openqa.grid.web.utils.ExtraServletUtil;
 import org.openqa.selenium.json.Json;
@@ -188,6 +189,13 @@ public class Hub implements Stoppable {
       root.setAttribute(GridRegistry.KEY, registry);
 
       addDefaultServlets(root);
+
+
+      //User facing API V1 end points
+      for(APIEndpointRegistry.EndPoint endpoint : APIEndpointRegistry.getEndpoints()){
+        root.addServlet(endpoint.getClassName(), endpoint.getServerRegistrationPermalink());
+      }
+      //END User facing API V1 end points
 
       // Load any additional servlets provided by the user.
       for (Map.Entry<String, Class<? extends Servlet>> entry : extraServlet.entrySet()) {
