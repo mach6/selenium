@@ -17,35 +17,59 @@
 
 package org.openqa.grid.web.servlet.api.v1;
 
-import org.openqa.grid.internal.ProxySet;
-import org.openqa.grid.internal.RemoteProxy;
-import org.openqa.grid.internal.TestSlot;
-import org.openqa.grid.web.servlet.api.v1.utils.ProxyIdUtil;
+import com.google.gson.JsonObject;
 
+import org.openqa.grid.internal.TestSession;
+import org.openqa.grid.web.servlet.api.v1.utils.ProxyUtil;
+
+import java.net.URL;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 public class Sessions extends RestApiEndpoint {
 
-  public Map<String, Map<String, String>> getResponse(String query) {
+  @Override
+  public Object getResponse(String query) {
+    Map<String, Object> sessionInfo = new HashMap<>();
+    if (isInvalidQuery(query)) {
+      return getAllSessions();
+    }
 
-    Map<String, Map<String, String>> sessions = new HashMap<String, Map<String, String>>();
-
-    ProxySet proxies = this.getRegistry().getAllProxies();
-    Iterator<RemoteProxy> iterator = proxies.iterator();
-    while (iterator.hasNext()) {
-      RemoteProxy currentProxy = iterator.next();
-
-      for (TestSlot slot : currentProxy.getTestSlots()) {
-        if (slot.getSession() != null) {
-          Map<String, String> systemInfo = new HashMap<String, String>();
-          systemInfo.put("host", currentProxy.getRemoteHost().getHost());
-          systemInfo.put("proxy", ProxyIdUtil.encodeId(currentProxy.getId()));
-
-          sessions.put(slot.getSession().getExternalKey().getKey(), systemInfo);
-        }
+    final String sessionId = query.replaceAll("^/", "");
+    for (TestSession session : getRegistry().getActiveSessions()) {
+      if (session.getExternalKey().getKey().equals(sessionId)) {
+        sessionInfo.put("isOrphaned", session.isOrphaned());
+        sessionInfo.put("internalKey", session.getInternalKey());
+        sessionInfo.put("requestedCapabilities", session.getRequestedCapabilities());
+        sessionInfo.put("isForwardingRequest", session.isForwardingRequest());
+        sessionInfo.put("protocol", session.getSlot().getProtocol());
+        sessionInfo.put("lastActivityWasAt",session.getInactivityTime());
+        sessionInfo.put("requestPath", session.getSlot().getPath());
+        JsonObject proxy = new JsonObject();
+        URL url = session.getSlot().getProxy().getRemoteHost();
+        proxy.addProperty("host", url.getHost());
+        proxy.addProperty("port", url.getPort());
+        proxy.addProperty("nodeId", session.getSlot().getProxy().getId());
+        sessionInfo.put("proxy", proxy);
+        break;
       }
+
+    }
+    return sessionInfo;
+  }
+
+  private Map<String, JsonObject> getAllSessions() {
+    Map<String, JsonObject> sessions = new HashMap<>();
+    Set<TestSession> activeSessions = this.getRegistry().getActiveSessions();
+    for (TestSession session : activeSessions) {
+      JsonObject sessionData = new JsonObject();
+      sessionData.add("slotInfo", ProxyUtil.getNodeInfo(session.getSlot().getProxy()));
+      String browser = (String) ProxyUtil.getBrowser(session.getRequestedCapabilities());
+      if (browser != null && !browser.trim().isEmpty()) {
+        sessionData.addProperty("browser", browser);
+      }
+      sessions.put(session.getExternalKey().getKey(), sessionData);
     }
     return sessions;
   }

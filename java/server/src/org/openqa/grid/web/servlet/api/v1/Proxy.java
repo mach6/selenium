@@ -17,46 +17,98 @@
 
 package org.openqa.grid.web.servlet.api.v1;
 
-import org.openqa.grid.internal.RemoteProxy;
-import org.openqa.grid.internal.TestSession;
-import org.openqa.grid.internal.TestSlot;
-import org.openqa.grid.web.servlet.api.v1.utils.ProxyIdUtil;
+import com.google.gson.JsonObject;
 
-import java.util.Arrays;
+import org.openqa.grid.internal.ProxySet;
+import org.openqa.grid.internal.RemoteProxy;
+import org.openqa.grid.internal.TestSlot;
+import org.openqa.grid.web.servlet.api.v1.utils.ProxyUtil;
+import org.openqa.selenium.remote.CapabilityType;
+
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
 public class Proxy extends RestApiEndpoint {
 
-  public Map getResponse(String query) {
-    Map<String, Object> proxyInfo = new HashMap();
-
-    if (query == null || query.equals("/")) {
-      //do nothing, bc user didn't deem it important enough to give any info :-P
-    } else {
-      final String proxyToFind = ProxyIdUtil.decodeId(query.replaceAll("^/", ""));
-      final RemoteProxy proxy = this.getRegistry().getAllProxies().getProxyById(proxyToFind);
-      proxyInfo.put("config", proxy.getConfig().toJson());
-      proxyInfo.put("totalUsed", proxy.getTotalUsed());
-      proxyInfo.put("percentUsed", proxy.getResourceUsageInPercent());
-      proxyInfo.put("capabilityHelper", proxy.getCapabilityHelper().getClass().getCanonicalName());
-      proxyInfo.put("htmlRenderer", proxy.getHtmlRender().getClass().getCanonicalName());
-      proxyInfo.put("lastSessionStart", proxy.getLastSessionStart());
-      proxyInfo.put("isBusy", proxy.isBusy());
-      proxyInfo.put("registrationRequest", proxy.getOriginalRegistrationRequest().toJson());
-      proxyInfo.put("status", proxy.getStatus());
-      List<TestSession> sessions = Arrays.asList();
-      for (TestSlot slot : proxy.getTestSlots()) {
-        if ((slot == null) || (slot.getSession() == null)) {
-          continue;
-        }
-        if (slot.getSession().isForwardingRequest()) {
-          sessions.add(slot.getSession());
-        }
-      }
-      proxyInfo.put("sessions", sessions);
+  @Override
+  public Object getResponse(String query) {
+    Map<String, Object> proxyInfo = new HashMap<>();
+    if (isInvalidQuery(query)) {
+      return allProxyInfo();
     }
+
+    final String proxyToFind = query.replaceAll("^/", "");
+    RemoteProxy proxy = this.getRegistry().getAllProxies().getProxyById(proxyToFind);
+    if (proxy == null) {
+      //Maybe user gave only the node ip and port
+      proxy = this.getRegistry().getAllProxies().getProxyById(getProxyId(proxyToFind));
+    }
+    if (proxy == null) {
+      return allProxyInfo();
+    }
+    proxyInfo.put("config", proxy.getConfig().toJson());
+    proxyInfo.put("slotUsage", ProxyUtil.getSlotUsage(proxy));
+    proxyInfo.put("percentUsed", proxy.getResourceUsageInPercent());
+    proxyInfo.put("htmlRenderer", proxy.getHtmlRender().getClass().getCanonicalName());
+    proxyInfo.put("lastSessionStart", proxy.getLastSessionStart());
+    proxyInfo.put("isBusy", proxy.isBusy());
+    JsonObject status = proxy.getStatus();
+    addInfoFromStatusIfPresent(proxyInfo, "build", status);
+    addInfoFromStatusIfPresent(proxyInfo, "os", status);
+    addInfoFromStatusIfPresent(proxyInfo, "java", status);
+    List<JsonObject> sessions = new LinkedList<>();
+    for (TestSlot slot : proxy.getTestSlots()) {
+      if ((slot == null) || (slot.getSession() == null)) {
+        continue;
+      }
+      JsonObject session = new JsonObject();
+      String key = CapabilityType.BROWSER_NAME;
+      String browser = (String)slot.getSession().getRequestedCapabilities().get(key);
+      if (browser != null) {
+        session.addProperty(key, browser);
+      }
+      session.addProperty("sessionId", slot.getSession().getExternalKey().getKey());
+      sessions.add(session);
+    }
+    proxyInfo.put("sessions", sessions);
+    proxyInfo.put("slotUsage", ProxyUtil.getDetailedSlotUsage(proxy));
     return proxyInfo;
   }
+
+  private List<JsonObject> allProxyInfo() {
+    ProxySet proxies = this.getRegistry().getAllProxies();
+    List<JsonObject> computers = new LinkedList<>();
+    for (RemoteProxy each : proxies) {
+      computers.add(gatherComputerData(each));
+    }
+    return computers;
+  }
+
+  private static String getProxyId(String proxyToFind) {
+    String[] parts = proxyToFind.split(":", 2);
+    if (parts.length < 2) {
+      return proxyToFind;
+    }
+    return "http://" + parts[0] + ":" + parts[1];
+  }
+
+  private static void addInfoFromStatusIfPresent(Map<String, Object> map, String key, JsonObject status) {
+    if (!status.has("value")) {
+      return;
+    }
+    JsonObject value = status.get("value").getAsJsonObject();
+    if (! value.has(key)) {
+      return;
+    }
+    map.put(key, value.get(key).getAsJsonObject());
+  }
+
+  private JsonObject gatherComputerData(RemoteProxy proxy) {
+    JsonObject computer = ProxyUtil.getNodeInfo(proxy);
+    computer.add("slotUsage", ProxyUtil.getDetailedSlotUsage(proxy));
+    return computer;
+  }
+
 }
