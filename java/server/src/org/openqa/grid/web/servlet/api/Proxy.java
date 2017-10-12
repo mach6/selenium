@@ -15,14 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.openqa.grid.web.servlet.api.v1;
+package org.openqa.grid.web.servlet.api;
 
 import com.google.gson.JsonObject;
 
 import org.openqa.grid.internal.ProxySet;
 import org.openqa.grid.internal.RemoteProxy;
 import org.openqa.grid.internal.TestSlot;
-import org.openqa.grid.web.servlet.api.v1.utils.ProxyUtil;
 import org.openqa.selenium.remote.CapabilityType;
 
 import java.util.HashMap;
@@ -30,10 +29,20 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+@RestPath(path = "proxies",
+    description = "Returns configuration and capability information for proxies connected to the hub.")
 public class Proxy extends RestApiEndpoint {
 
-  @Override
-  public Object getResponse(String query) {
+  @RestGet
+  @RestPath(description = "Get all proxies.")
+  public Object getProxies() {
+    return null;
+  }
+
+  @RestGet
+  @RestPath(path = "{id}",
+      description = "Get a specific proxy using its id.")
+  public Object getResponse(@RestPathParam("id") String query) {
     Map<String, Object> proxyInfo = new HashMap<>();
     if (isInvalidQuery(query)) {
       return allProxyInfo();
@@ -110,5 +119,6 @@ public class Proxy extends RestApiEndpoint {
     computer.add("slotUsage", ProxyUtil.getDetailedSlotUsage(proxy));
     return computer;
   }
+
 
 }

@@ -26,14 +26,11 @@ import org.openqa.grid.shared.Stoppable;
 import org.openqa.grid.web.servlet.DisplayHelpServlet;
 import org.openqa.grid.web.servlet.DriverServlet;
 import org.openqa.grid.web.servlet.Grid1HeartbeatServlet;
-import org.openqa.grid.web.servlet.HubStatusServlet;
 import org.openqa.grid.web.servlet.HubW3CStatusServlet;
 import org.openqa.grid.web.servlet.LifecycleServlet;
-import org.openqa.grid.web.servlet.ProxyStatusServlet;
 import org.openqa.grid.web.servlet.RegistrationServlet;
 import org.openqa.grid.web.servlet.ResourceServlet;
-import org.openqa.grid.web.servlet.TestSessionStatusServlet;
-import org.openqa.grid.web.servlet.api.v1.APIEndpointRegistry;
+import org.openqa.grid.web.servlet.api.APIEndpointRegistry;
 import org.openqa.grid.web.servlet.beta.ConsoleServlet;
 import org.openqa.grid.web.utils.ExtraServletUtil;
 import org.openqa.selenium.json.Json;
@@ -129,19 +126,13 @@ public class Hub implements Stoppable {
     handler.addServlet(DriverServlet.class.getName(), "/wd/hub/*");
     handler.addServlet(DriverServlet.class.getName(), "/selenium-server/driver/*");
 
-    handler.addServlet(ProxyStatusServlet.class.getName(), "/grid/api/proxy/*");
-
-    handler.addServlet(HubStatusServlet.class.getName(), "/grid/api/hub/*");
-
     ServletHolder statusHolder = new ServletHolder(new HubW3CStatusServlet(getRegistry()));
     handler.addServlet(statusHolder, "/status");
     handler.addServlet(statusHolder, "/wd/hub/status");
 
-    handler.addServlet(TestSessionStatusServlet.class.getName(), "/grid/api/testsession/*");
-
-    //User facing API V1 end points
-    for (APIEndpointRegistry.EndPoint endpoint : APIEndpointRegistry.getEndpoints()) {
-      handler.addServlet(endpoint.getClassName(), endpoint.getServerRegistrationPermalink());
+    // user facing API servlets
+      for (APIEndpointRegistry.EndPoint endpoint : APIEndpointRegistry.getEndpoints()) {
+      handler.addServlet(endpoint.getClassName(), endpoint.getPathSpec());
     }
 
     // add optional default servlets

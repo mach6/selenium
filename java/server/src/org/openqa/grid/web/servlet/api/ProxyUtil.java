@@ -15,8 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.openqa.grid.web.servlet.api.v1.utils;
+package org.openqa.grid.web.servlet.api;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
@@ -29,7 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ProxyUtil {
+class ProxyUtil {
 
   private static final String TOTAL = "total";
   private static final String BUSY = "busy";
@@ -43,11 +44,11 @@ public class ProxyUtil {
    * @return - A {@link JsonObject} that contains the details of the remote proxy.
    */
   public static JsonObject getNodeInfo(RemoteProxy proxy) {
-    JsonObject computer = new JsonObject();
-    computer.addProperty("host", proxy.getRemoteHost().getHost());
-    computer.addProperty("port", proxy.getRemoteHost().getPort());
-    computer.addProperty("id", proxy.getId());
-    return computer;
+    JsonObject info = new JsonObject();
+    info.addProperty("host", proxy.getRemoteHost().getHost());
+    info.addProperty("port", proxy.getRemoteHost().getPort());
+    info.addProperty("id", proxy.getId());
+    return info;
   }
 
   /**
@@ -57,7 +58,7 @@ public class ProxyUtil {
   public static JsonObject getDetailedSlotUsage(RemoteProxy proxy) {
     JsonObject slots = getSlotUsage(proxy);
     JsonArray browsers = new JsonArray();
-    for (Map.Entry<String, JsonObject> each : getBreakup(proxy.getTestSlots()).entrySet()) {
+    for (Map.Entry<String, JsonObject> each : getSlotUsageDetail(proxy.getTestSlots()).entrySet()) {
       JsonObject browser = new JsonObject();
       browser.addProperty("browser", each.getKey());
       browser.add("usage", each.getValue());
@@ -86,7 +87,7 @@ public class ProxyUtil {
     return caps.get(CapabilityType.BROWSER_NAME);
   }
 
-  private static Map<String, JsonObject> getBreakup(List<TestSlot> slots) {
+  private static Map<String, JsonObject> getSlotUsageDetail(List<TestSlot> slots) {
     Map<String, JsonObject> data = new HashMap<>();
     for (TestSlot slot : slots) {
       String browser = (String) getBrowser(slot.getCapabilities());
@@ -96,7 +97,7 @@ public class ProxyUtil {
       JsonObject usage = constructBrowserUsageStats(slot.getSession(), data.get(browser));
       data.put(browser, usage);
     }
-    return data;
+    return ImmutableMap.copyOf(data);
   }
 
   private static JsonObject constructBrowserUsageStats(TestSession session, JsonObject usage) {

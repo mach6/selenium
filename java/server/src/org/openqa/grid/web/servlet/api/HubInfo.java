@@ -15,19 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.openqa.grid.web.servlet.api.v1;
+package org.openqa.grid.web.servlet.api;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import org.openqa.grid.internal.RemoteProxy;
-import org.openqa.grid.web.servlet.api.v1.utils.ProxyUtil;
 
 import java.net.URL;
 
+/**
+ * Intended to be a replacement for the so called {@link org.openqa.grid.web.servlet.HubStatusServlet}
+ */
+@RestPath(path = "hub",
+    description = "Returns configuration and proxy information of the hub.")
 public class HubInfo extends RestApiEndpoint {
 
-  @Override
+  @RestGet
   public Object getResponse(String query) {
     JsonObject hubData = new JsonObject();
     hubData.add("configuration", getRegistry().getConfiguration().toJson());
@@ -38,6 +42,8 @@ public class HubInfo extends RestApiEndpoint {
     hubData.addProperty("usedProxyCount", getRegistry().getUsedProxies().size());
     hubData.addProperty("totalProxyCount", getRegistry().getAllProxies().size());
     hubData.addProperty("activeSessionCount", getRegistry().getActiveSessions().size());
+    hubData.add("slotCounts", getSlotCounts());
+    hubData.addProperty( "success", true);
     return hubData;
   }
 
@@ -51,7 +57,7 @@ public class HubInfo extends RestApiEndpoint {
 
   private String urlToString(URL url) {
     return String
-        .format("%s://%s:%d/%s", url.getProtocol(), url.getHost(), url.getPort(), url.getPath());
+        .format("%s://%s:%d%s", url.getProtocol(), url.getHost(), url.getPort(), url.getPath());
   }
 
   private JsonArray proxies() {
@@ -60,6 +66,20 @@ public class HubInfo extends RestApiEndpoint {
       proxies.add(ProxyUtil.getNodeInfo(proxy));
     }
     return proxies;
+  }
+
+  private JsonObject getSlotCounts() {
+    int totalSlots = 0;
+    int usedSlots = 0;
+
+    for (RemoteProxy proxy : getRegistry().getAllProxies()) {
+      totalSlots += Math.min(proxy.getMaxNumberOfConcurrentTestSessions(), proxy.getTestSlots().size());
+      usedSlots += proxy.getTotalUsed();
+    }
+    JsonObject result = new JsonObject();
+    result.addProperty("free", totalSlots - usedSlots);
+    result.addProperty("total", totalSlots);
+    return result;
   }
 
 }

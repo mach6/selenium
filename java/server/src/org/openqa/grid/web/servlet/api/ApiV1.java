@@ -15,13 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.openqa.grid.web.servlet.api.v1;
-
-import com.google.gson.GsonBuilder;
-
-import org.openqa.grid.common.exception.GridException;
-import org.openqa.grid.internal.Registry;
-import org.openqa.grid.web.servlet.RegistryBasedServlet;
+package org.openqa.grid.web.servlet.api;
 
 import java.io.IOException;
 
@@ -29,43 +23,44 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public abstract class RestApiEndpoint extends RegistryBasedServlet {
-
-  RestApiEndpoint() {
-    this(null);
-  }
-
-  RestApiEndpoint(Registry registry) {
-    super(registry);
-  }
+public class ApiV1 extends RestApiEndpoint {
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp)
     throws ServletException, IOException {
-    process(req, resp);
-  }
 
-  protected void process(HttpServletRequest request, HttpServletResponse response)
-    throws IOException {
-
-    response.setContentType("application/json");
-    response.setCharacterEncoding("UTF-8");
-    response.setStatus(200);
+    resp.setContentType("text/html");
+    resp.setCharacterEncoding("UTF-8");
+    resp.setStatus(200);
 
     try {
-      response.getWriter().print(new GsonBuilder().setPrettyPrinting().create()
-                                     .toJson(getResponse(request.getPathInfo())));
-    } catch (RuntimeException e) {
-      throw new GridException(e.getMessage());
+      resp.getWriter().write(buildHtmlResponse());
     } finally {
-      response.getWriter().close();
+      resp.getWriter().close();
     }
   }
 
-  public abstract Object getResponse(String query);
-
-  boolean isInvalidQuery(String query) {
-    return query == null || "/".equals(query);
+  @Override
+  public Object getResponse(String query) {
+    return null;
   }
 
+  private String buildHtmlResponse() {
+    StringBuilder html = new StringBuilder();
+    html.append("<html><body>");
+    html.append("GET endpoints: <br/>");
+    html.append("<ul>");
+
+    for (APIEndpointRegistry.EndPoint e : APIEndpointRegistry.getEndpoints()) {
+      html.append(String.format("<li><a href='%s'>%s</a> <ul> ", e.getPath(), e.getPath()));
+      html.append(String.format("<li>Description: %s</li>",e.getDescription()));
+      html.append(String.format("<li>Class: %s</li>",e.getClassName()));
+      html.append(String.format("<li>Usage: %s</li>",e.getUsage()));
+      html.append("</ul></li>");
+    }
+
+    html.append("</ul>");
+    html.append("</body></html>");
+    return html.toString();
+  }
 }

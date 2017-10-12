@@ -15,22 +15,31 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.openqa.grid.web.servlet.api.v1;
+package org.openqa.grid.web.servlet.api;
 
 import com.google.gson.JsonObject;
 
 import org.openqa.grid.internal.TestSession;
-import org.openqa.grid.web.servlet.api.v1.utils.ProxyUtil;
 
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+@RestPath(path = "sessions",
+    description = "Returns details for sessions connected to the hub.")
 public class Sessions extends RestApiEndpoint {
 
-  @Override
-  public Object getResponse(String query) {
+  @RestGet
+  @RestPath(description = "Get all sessions")
+  public Object getSessions() {
+    return null;
+  }
+
+  @RestGet
+  @RestPath(path = "{id}",
+      description = "Get a specific session using its id.")
+  public Object getResponse(@RestPathParam("id") String query) {
     Map<String, Object> sessionInfo = new HashMap<>();
     if (isInvalidQuery(query)) {
       return getAllSessions();

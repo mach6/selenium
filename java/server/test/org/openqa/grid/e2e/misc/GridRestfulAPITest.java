@@ -136,7 +136,7 @@ public class GridRestfulAPITest {
   }
 
   private JsonElement invoke(String path) throws IOException {
-    URL url = new URL(String.format("http://%s:%s/api/v1/%s",
+    URL url = new URL(String.format("http://%s:%s/grid/api/beta/%s",
                                     hub.getConfiguration().host,
                                     hub.getConfiguration().port, path));
     HttpClientFactory httpClientFactory = new HttpClientFactory();
