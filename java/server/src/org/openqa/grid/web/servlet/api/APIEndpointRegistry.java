@@ -19,6 +19,7 @@ package org.openqa.grid.web.servlet.api;
 
 import com.google.common.collect.ImmutableList;
 
+import org.openqa.grid.web.servlet.HubStatusServlet;
 import org.openqa.grid.web.servlet.ProxyStatusServlet;
 import org.openqa.grid.web.servlet.TestSessionStatusServlet;
 
@@ -77,23 +78,22 @@ public class APIEndpointRegistry {
     }
   }
 
-  private static final String API_PREFIX = "/grid/api";
+  public static final String API_PREFIX = "/grid/api";
   private static final String BETA_API_PREFIX = API_PREFIX + "/beta";
 
   private static final List<EndPoint> endpoints = ImmutableList.of(
-    new EndPoint(API_PREFIX, "HTML page documenting the API endpoints (this page)",
-                 ApiV1.class.getName()),
-
     new EndPoint(BETA_API_PREFIX, HubInfo.class),
     new EndPoint(BETA_API_PREFIX, Proxy.class),
     new EndPoint(BETA_API_PREFIX, Sessions.class),
+
+    new EndPoint(API_PREFIX + "/hub", "Return hub status to nodes",
+                 HubStatusServlet.class.getName(), API_PREFIX + "/hub"),
 
     new EndPoint(API_PREFIX + "/proxy", "Returns registration information for a proxy.",
                  ProxyStatusServlet.class.getName(), API_PREFIX + "/proxy?id=&lt;proxyId&gt;"),
 
     new EndPoint(API_PREFIX + "/testsession", "Returns status information for a test session.",
-                 TestSessionStatusServlet.class.getName(),
-                 API_PREFIX + "/testsession?session=&lt;sessionId&gt;")
+                 TestSessionStatusServlet.class.getName(),API_PREFIX + "/testsession?session=&lt;sessionId&gt;")
   );
 
   private APIEndpointRegistry() {

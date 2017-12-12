@@ -22,6 +22,7 @@ import com.google.gson.JsonObject;
 import org.openqa.grid.internal.TestSession;
 
 import java.net.URL;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -32,40 +33,46 @@ public class Sessions extends RestApiEndpoint {
 
   @RestGet
   @RestPath(description = "Get all sessions")
-  public Object getSessions() {
-    return null;
+  public RestResponse getSessions() {
+    return new RestResponse()
+        .setEntity(getAllSessions())
+        .ok();
   }
 
   @RestGet
   @RestPath(path = "{id}",
       description = "Get a specific session using its id.")
-  public Object getResponse(@RestPathParam("id") String query) {
-    Map<String, Object> sessionInfo = new HashMap<>();
-    if (isInvalidQuery(query)) {
-      return getAllSessions();
+  public RestResponse getSession(@RestPathParam("id") String sessionId) {
+     Map<String, Object> sessionInfo = Collections.emptyMap();
+
+    TestSession session = getRegistry().getActiveSessions()
+        .stream()
+        .filter(s -> s.getExternalKey().getKey().equals(sessionId))
+        .findFirst()
+        .orElse(null);
+
+    if (session == null) {
+      return new RestResponse()
+        .setStatus(404);
     }
 
-    final String sessionId = query.replaceAll("^/", "");
-    for (TestSession session : getRegistry().getActiveSessions()) {
-      if (session.getExternalKey().getKey().equals(sessionId)) {
-        sessionInfo.put("isOrphaned", session.isOrphaned());
-        sessionInfo.put("internalKey", session.getInternalKey());
-        sessionInfo.put("requestedCapabilities", session.getRequestedCapabilities());
-        sessionInfo.put("isForwardingRequest", session.isForwardingRequest());
-        sessionInfo.put("protocol", session.getSlot().getProtocol());
-        sessionInfo.put("lastActivityWasAt",session.getInactivityTime());
-        sessionInfo.put("requestPath", session.getSlot().getPath());
-        JsonObject proxy = new JsonObject();
-        URL url = session.getSlot().getProxy().getRemoteHost();
-        proxy.addProperty("host", url.getHost());
-        proxy.addProperty("port", url.getPort());
-        proxy.addProperty("nodeId", session.getSlot().getProxy().getId());
-        sessionInfo.put("proxy", proxy);
-        break;
-      }
+    sessionInfo.put("isOrphaned", session.isOrphaned());
+    sessionInfo.put("internalKey", session.getInternalKey());
+    sessionInfo.put("requestedCapabilities", session.getRequestedCapabilities());
+    sessionInfo.put("isForwardingRequest", session.isForwardingRequest());
+    sessionInfo.put("protocol", session.getSlot().getProtocol());
+    sessionInfo.put("lastActivityWasAt",session.getInactivityTime());
+    sessionInfo.put("requestPath", session.getSlot().getPath());
+    JsonObject proxy = new JsonObject();
+    URL url = session.getSlot().getProxy().getRemoteHost();
+    proxy.addProperty("host", url.getHost());
+    proxy.addProperty("port", url.getPort());
+    proxy.addProperty("nodeId", session.getSlot().getProxy().getId());
+    sessionInfo.put("proxy", proxy);
 
-    }
-    return sessionInfo;
+    return new RestResponse()
+      .setEntity(sessionInfo)
+      .ok();
   }
 
   private Map<String, JsonObject> getAllSessions() {

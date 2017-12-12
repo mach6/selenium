@@ -17,17 +17,27 @@
 
 package org.openqa.grid.web.servlet.api;
 
+import org.openqa.grid.internal.GridRegistry;
+import org.openqa.grid.web.servlet.RegistryBasedServlet;
+
 import java.io.IOException;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public class ApiV1 extends RestApiEndpoint {
+public class ApiV1 extends RegistryBasedServlet {
+
+  public ApiV1() {
+    this(null);
+  }
+
+  public ApiV1(GridRegistry registry) {
+    super(registry);
+  }
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-    throws ServletException, IOException {
+      throws IOException{
 
     resp.setContentType("text/html");
     resp.setCharacterEncoding("UTF-8");
@@ -38,11 +48,6 @@ public class ApiV1 extends RestApiEndpoint {
     } finally {
       resp.getWriter().close();
     }
-  }
-
-  @Override
-  public Object getResponse(String query) {
-    return null;
   }
 
   private String buildHtmlResponse() {

@@ -17,17 +17,23 @@
 
 package org.openqa.grid.web.servlet.api;
 
-import static com.google.common.net.MediaType.JSON_UTF_8;
-
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import com.google.common.io.CharStreams;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.openqa.grid.common.exception.GridException;
-import org.openqa.grid.internal.Registry;
+import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.web.servlet.RegistryBasedServlet;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -38,21 +44,159 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public abstract class RestApiEndpoint extends RegistryBasedServlet {
+public class RestApiEndpoint extends RegistryBasedServlet {
   private Map<String, Method> getMethods = Collections.emptyMap();
   private Map<String, Method> postMethods = Collections.emptyMap();
-  private Map<String, Method> deleteMethods  = Collections.emptyMap();
+  private Map<String, Method> deleteMethods = Collections.emptyMap();
   private Map<String, Method> putMethods = Collections.emptyMap();
+
+  private class RestDetails {
+    final private Map<String, String> pathParamsMap = Maps.newHashMap();
+
+    Method method;
+    HttpServletRequest httpServletRequest;
+    HttpServletResponse httpServletResponse;
+    Object[] methodArgs;
+
+    RestDetails(HttpServletRequest req, HttpServletResponse resp, Map<String, Method> methods)
+        throws IOException {
+      httpServletRequest = req;
+      httpServletResponse = resp;
+      getMethodMatchingRestPath(methods);
+
+      if (method == null) {
+        httpServletResponse.sendError(404);
+        return;
+      }
+
+      if (method.getParameterCount() > 0) {
+        methodArgs = new Object[method.getParameterCount()];
+        buildPathParamsMap();
+        fillMethodArgs();
+      }
+    }
+
+    private void getMethodMatchingRestPath(Map<String, Method> methods) {
+      final String pathInfo = httpServletRequest.getPathInfo();
+
+      if (pathInfo == null && methods.containsKey("")) {
+        method = methods.get("");
+        return;
+      }
+
+      String[] pathTokens = pathInfo.toLowerCase().split("/");
+      if (pathTokens.length == 0 && methods.containsKey("")) {
+        method = methods.get("");
+        return;
+      }
+
+      List<String> potentialKeyMatches = methods.keySet()
+          .stream()
+          .filter(k -> ("/" + k).split("/").length == pathTokens.length)
+          .collect(Collectors.toList());
+
+      if (potentialKeyMatches.size() == 1) {
+        method = methods.get(potentialKeyMatches.get(0));
+      }
+    }
+
+    private void fillMethodArgs() {
+      int i = 0;
+      for (Parameter p : method.getParameters()) {
+        if (p.isAnnotationPresent(RestPathParam.class)) {
+          //TODO check type.. don't cast.
+          methodArgs[i] =
+              p.getType().cast(pathParamsMap.get(p.getAnnotation(RestPathParam.class).value()));
+        } else if (p.isAnnotationPresent(RestQueryParam.class)) {
+          //TODO check type.. don't cast.
+          methodArgs[i] =
+              p.getType().cast(httpServletRequest.getParameterMap().get(p.getAnnotation(RestQueryParam.class).value()));
+        } else if (p.isAnnotationPresent(RestHeaderParam.class)) {
+          final String headerVal =
+              httpServletRequest.getHeader(p.getAnnotation(RestHeaderParam.class).value());
+          //TODO check type.. don't cast.
+          methodArgs[i] = p.getType().cast(headerVal);
+        } else if (p.getType() == HttpServletRequest.class) {
+          methodArgs[i] = httpServletRequest;
+        } else if (p.getType() == HttpServletResponse.class) {
+          methodArgs[i] = httpServletResponse;
+        } else if (method.isAnnotationPresent(RestPost.class)
+                  || method.isAnnotationPresent(RestPut.class)){
+          Class<?> parameterType = p.getType();
+          try {
+            //TODO Clean up and handler more deserializers
+            Method deserializer = parameterType.getMethod("loadFromJSON", JsonObject.class);
+            if (deserializer != null) {
+              methodArgs[i] = deserializer.invoke(this, getRequestJSON());
+            }
+            deserializer = parameterType.getMethod("fromJson", String.class);
+            if (deserializer != null) {
+              methodArgs[i] = deserializer.invoke(this, getRequestJSON());
+            }
+          } catch (NoSuchMethodException | IOException | InvocationTargetException | IllegalAccessException e) {
+            //ignore
+          }
+        }
+        i += 1;
+      }
+    }
+
+    private JsonObject getRequestJSON() throws IOException {
+      String requestJsonString;
+      try (BufferedReader rd =
+               new BufferedReader(new InputStreamReader(httpServletRequest.getInputStream()))) {
+        requestJsonString = CharStreams.toString(rd);
+      }
+      return new JsonParser().parse(requestJsonString).getAsJsonObject();
+    }
+
+    private void buildPathParamsMap() {
+      final RestPath restPath;
+      if (method.isAnnotationPresent(RestPath.class)) {
+        restPath = method.getAnnotation(RestPath.class);
+      } else {
+        return;
+      }
+
+      final String restPathValue = restPath.path();
+      final String pathInfo = httpServletRequest.getPathInfo();
+
+      if (pathInfo == null || pathInfo.isEmpty()
+          || restPathValue == null || restPathValue.isEmpty())  {
+        return;
+      }
+
+      String[] rpt = ("/" + restPathValue).split("/");
+      String[] pvt = pathInfo.split("/");
+
+      // should not happen.. wouldn't know how to handle it.
+      if (rpt.length != pvt.length) {
+        return;
+      }
+
+      for (int i = 0; i < rpt.length; i+=1) {
+        if  (rpt[i].matches("^\\{(.*)\\}")) {
+          pathParamsMap.put(rpt[i]
+                                .replace("{", "")
+                                .replace("}", ""),
+                            pvt[i]);
+        }
+      }
+    }
+
+  }
 
   RestApiEndpoint() {
     this(null);
   }
 
-  RestApiEndpoint(Registry registry) {
+  RestApiEndpoint(GridRegistry registry) {
     super(registry);
 
     getMethods = reflectMethods(RestGet.class);
     postMethods = reflectMethods(RestPost.class);
+    deleteMethods = reflectMethods(RestDelete.class);
+    putMethods = reflectMethods(RestPut.class);
   }
 
   @Override
@@ -63,8 +207,7 @@ public abstract class RestApiEndpoint extends RegistryBasedServlet {
       super.doGet(req, resp);
       return;
     }
-
-    process(req, resp);
+   process(new RestDetails(req, resp, getMethods));
   }
 
   @Override
@@ -75,7 +218,7 @@ public abstract class RestApiEndpoint extends RegistryBasedServlet {
       super.doPost(req, resp);
       return;
     }
-
+    process(new RestDetails(req, resp, postMethods));
   }
 
   @Override
@@ -86,7 +229,7 @@ public abstract class RestApiEndpoint extends RegistryBasedServlet {
       super.doPut(req, resp);
       return;
     }
-
+    process(new RestDetails(req, resp, putMethods));
   }
 
   @Override
@@ -97,30 +240,41 @@ public abstract class RestApiEndpoint extends RegistryBasedServlet {
       super.doDelete(req, resp);
       return;
     }
-
+    process(new RestDetails(req, resp, deleteMethods));
   }
 
-  protected void process(HttpServletRequest request, HttpServletResponse response)
+  protected void process(RestDetails details)
     throws IOException {
 
-    response.setContentType(JSON_UTF_8.toString());
-    response.setCharacterEncoding("UTF-8");
-    response.setStatus(200);
-
     try {
-      response.getWriter().print(new GsonBuilder().setPrettyPrinting().create()
-                                     .toJson(getResponse(request.getPathInfo())));
-    } catch (RuntimeException e) {
+      Object invokeResponse = details.method.invoke(this, details.methodArgs);
+
+      if (details.method.getReturnType() == RestResponse.class) {
+        RestResponse restResponse = (RestResponse) invokeResponse;
+        if (restResponse.getStatus() == 500) {
+          details.httpServletResponse.sendError(500);
+          return;
+        }
+        details.httpServletResponse.setContentType(restResponse.getContentType());
+        details.httpServletResponse.setCharacterEncoding(restResponse.getEncoding());
+        details.httpServletResponse.setStatus(restResponse.getStatus());
+        restResponse.getHeaders()
+            .forEach(
+                (k,v) -> details.httpServletResponse.addHeader(k, v)
+            );
+
+        // TODO this assumes a json response
+        details.httpServletResponse.getWriter().print(new GsonBuilder().setPrettyPrinting().create()
+                                       .toJson(restResponse.getEntity()));
+      } else {
+        details.httpServletResponse.sendError(500, "Unhandled return type " + details.method.getReturnType() + " for method.");
+      }
+
+    } catch (IllegalAccessException | InvocationTargetException | RuntimeException e) {
       throw new GridException(e.getMessage());
     } finally {
-      response.getWriter().close();
+      details.httpServletResponse.getWriter().close();
     }
-  }
-
-  public abstract Object getResponse(String query);
-
-  boolean isInvalidQuery(String query) {
-    return query == null || "/".equals(query) ;
   }
 
   private List<Method> getRestMethodsByType(Class<?> annotation) {
@@ -152,7 +306,10 @@ public abstract class RestApiEndpoint extends RegistryBasedServlet {
         .stream()
         .filter(m -> m.getAnnotation(RestPath.class) != null)
         .collect(Collectors.toMap(
-            a -> a.getAnnotation(RestPath.class).path(),
+            a -> a.getAnnotation(RestPath.class).path()
+                .trim()
+                .toLowerCase()
+                .replaceAll("^/", ""),
             a -> a
         ));
   }

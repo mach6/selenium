@@ -17,14 +17,18 @@
 
 package org.openqa.grid.web.servlet.api;
 
+import com.google.common.collect.Maps;
 import com.google.gson.JsonObject;
 
+import org.openqa.grid.common.RegistrationRequest;
+import org.openqa.grid.internal.BaseRemoteProxy;
 import org.openqa.grid.internal.ProxySet;
 import org.openqa.grid.internal.RemoteProxy;
 import org.openqa.grid.internal.TestSlot;
+import org.openqa.grid.internal.utils.configuration.GridNodeConfiguration;
 import org.openqa.selenium.remote.CapabilityType;
 
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -33,37 +37,59 @@ import java.util.Map;
     description = "Returns configuration and capability information for proxies connected to the hub.")
 public class Proxy extends RestApiEndpoint {
 
-  @RestGet
-  @RestPath(description = "Get all proxies.")
-  public Object getProxies() {
-    return null;
+  //TODO experimental
+  @RestPost
+  @RestPath(description = "Add a proxy.")
+  public RestResponse addProxy(GridNodeConfiguration proxyConfig) {
+    RemoteProxy proxy = BaseRemoteProxy.getNewInstance(new RegistrationRequest(proxyConfig), getRegistry());
+    getRegistry().add(proxy);
+
+    return new RestResponse()
+        .setStatus(201);
+  }
+
+  //TODO experimental
+  @RestDelete
+  @RestPath(path = "{id}", description = "Delete a proxy by its id.")
+  public RestResponse deleteProxy(@RestPathParam("id") String id) {
+    System.out.println("Deleting proxy " + id);
+    RemoteProxy proxy = getRegistry().getProxyById(id);
+    getRegistry().removeIfPresent(proxy);
+
+    return new RestResponse()
+        .ok();
   }
 
   @RestGet
-  @RestPath(path = "{id}",
-      description = "Get a specific proxy using its id.")
-  public Object getResponse(@RestPathParam("id") String query) {
-    Map<String, Object> proxyInfo = new HashMap<>();
-    if (isInvalidQuery(query)) {
-      return allProxyInfo();
+  @RestPath(description = "Get all proxies.")
+  public RestResponse getProxies() {
+    return new RestResponse()
+        .setEntity(allProxyInfo())
+        .ok();
+  }
+
+  @RestGet
+  @RestPath(path = "{id}", description = "Get a specific proxy using its id.")
+  public RestResponse getProxy(@RestPathParam("id") String proxyId) {
+    Map<String, Object> proxyInfo = Maps.newHashMap();
+
+    if (proxyId == null || proxyId.trim().isEmpty()) {
+      return new RestResponse().error();
     }
 
-    final String proxyToFind = query.replaceAll("^/", "");
-    RemoteProxy proxy = this.getRegistry().getAllProxies().getProxyById(proxyToFind);
+    RemoteProxy proxy = getRegistry().getProxyById(proxyId);
     if (proxy == null) {
       //Maybe user gave only the node ip and port
-      proxy = this.getRegistry().getAllProxies().getProxyById(getProxyId(proxyToFind));
+      proxy = getRegistry().getProxyById(getProxyId(proxyId));
     }
-    if (proxy == null) {
-      return allProxyInfo();
-    }
+
     proxyInfo.put("config", proxy.getConfig().toJson());
     proxyInfo.put("slotUsage", ProxyUtil.getSlotUsage(proxy));
     proxyInfo.put("percentUsed", proxy.getResourceUsageInPercent());
     proxyInfo.put("htmlRenderer", proxy.getHtmlRender().getClass().getCanonicalName());
     proxyInfo.put("lastSessionStart", proxy.getLastSessionStart());
     proxyInfo.put("isBusy", proxy.isBusy());
-    JsonObject status = proxy.getStatus();
+    JsonObject status = proxy.getStatus(); // TODO might fail
     addInfoFromStatusIfPresent(proxyInfo, "build", status);
     addInfoFromStatusIfPresent(proxyInfo, "os", status);
     addInfoFromStatusIfPresent(proxyInfo, "java", status);
@@ -83,7 +109,10 @@ public class Proxy extends RestApiEndpoint {
     }
     proxyInfo.put("sessions", sessions);
     proxyInfo.put("slotUsage", ProxyUtil.getDetailedSlotUsage(proxy));
-    return proxyInfo;
+
+    return new RestResponse()
+        .setEntity(proxyInfo)
+        .ok();
   }
 
   private List<JsonObject> allProxyInfo() {

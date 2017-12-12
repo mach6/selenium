@@ -25,6 +25,7 @@ import java.lang.annotation.Target;
 
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
-public @interface RestPost {
+@Target(ElementType.PARAMETER)
+public @interface RestHeaderParam {
+  String value() default "";
 }

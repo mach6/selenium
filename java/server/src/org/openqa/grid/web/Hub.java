@@ -31,6 +31,7 @@ import org.openqa.grid.web.servlet.LifecycleServlet;
 import org.openqa.grid.web.servlet.RegistrationServlet;
 import org.openqa.grid.web.servlet.ResourceServlet;
 import org.openqa.grid.web.servlet.api.APIEndpointRegistry;
+import org.openqa.grid.web.servlet.api.ApiV1;
 import org.openqa.grid.web.servlet.beta.ConsoleServlet;
 import org.openqa.grid.web.utils.ExtraServletUtil;
 import org.openqa.selenium.json.Json;
@@ -131,7 +132,8 @@ public class Hub implements Stoppable {
     handler.addServlet(statusHolder, "/wd/hub/status");
 
     // user facing API servlets
-      for (APIEndpointRegistry.EndPoint endpoint : APIEndpointRegistry.getEndpoints()) {
+    handler.addServlet(ApiV1.class.getName(), "/grid/api");
+    for (APIEndpointRegistry.EndPoint endpoint : APIEndpointRegistry.getEndpoints()) {
       handler.addServlet(endpoint.getClassName(), endpoint.getPathSpec());
     }
 

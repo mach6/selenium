@@ -32,7 +32,7 @@ import java.net.URL;
 public class HubInfo extends RestApiEndpoint {
 
   @RestGet
-  public Object getResponse(String query) {
+  public RestResponse getHubInfo() {
     JsonObject hubData = new JsonObject();
     hubData.add("configuration", getRegistry().getConfiguration().toJson());
     hubData.add("nodes", proxies());
@@ -44,7 +44,10 @@ public class HubInfo extends RestApiEndpoint {
     hubData.addProperty("activeSessionCount", getRegistry().getActiveSessions().size());
     hubData.add("slotCounts", getSlotCounts());
     hubData.addProperty( "success", true);
-    return hubData;
+
+    return new RestResponse()
+        .setEntity(hubData)
+        .ok();
   }
 
   private String registrationUrl() {
