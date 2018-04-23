@@ -25,6 +25,8 @@ import org.openqa.grid.web.servlet.TestSessionStatusServlet;
 
 import java.util.List;
 
+import javax.ws.rs.Path;
+
 public class APIEndpointRegistry {
   public static final class EndPoint {
     private String path;
@@ -33,12 +35,16 @@ public class APIEndpointRegistry {
     private String usage;
 
     EndPoint(String pathPrefix, Class<?> clazz) {
-      RestPath rp = clazz.getAnnotation(RestPath.class);
-      if (rp != null) {
+      if (clazz.isAnnotationPresent(Path.class)) {
+        Path rp = clazz.getAnnotation(Path.class);
         this.className = clazz.getName();
-        this.path = pathPrefix + ((rp.path().toCharArray()[0] == '/') ? "" : "/") + rp.path();
-        this.description = rp.description();
-        this.usage = rp.usage();
+        this.path = pathPrefix + ((rp.value().toCharArray()[0] == '/') ? "" : "/") + rp.value();
+      }
+
+      if (clazz.isAnnotationPresent(ApiDoc.class)) {
+        ApiDoc doc = clazz.getAnnotation(ApiDoc.class);
+        this.description = doc.value();
+        this.usage = doc.usage();
       }
     }
 

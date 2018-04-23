@@ -17,14 +17,12 @@
 
 package org.openqa.grid.web.servlet.api;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.io.CharStreams;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import org.openqa.grid.common.exception.GridException;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.web.servlet.RegistryBasedServlet;
 
@@ -43,6 +41,15 @@ import java.util.stream.Collectors;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Response;
 
 public class RestApiEndpoint extends RegistryBasedServlet {
   private Map<String, Method> getMethods = Collections.emptyMap();
@@ -103,25 +110,25 @@ public class RestApiEndpoint extends RegistryBasedServlet {
     private void fillMethodArgs() {
       int i = 0;
       for (Parameter p : method.getParameters()) {
-        if (p.isAnnotationPresent(RestPathParam.class)) {
+        if (p.isAnnotationPresent(PathParam.class)) {
           //TODO check type.. don't cast.
           methodArgs[i] =
-              p.getType().cast(pathParamsMap.get(p.getAnnotation(RestPathParam.class).value()));
-        } else if (p.isAnnotationPresent(RestQueryParam.class)) {
+              p.getType().cast(pathParamsMap.get(p.getAnnotation(PathParam.class).value()));
+        } else if (p.isAnnotationPresent(QueryParam.class)) {
           //TODO check type.. don't cast.
           methodArgs[i] =
-              p.getType().cast(httpServletRequest.getParameterMap().get(p.getAnnotation(RestQueryParam.class).value()));
-        } else if (p.isAnnotationPresent(RestHeaderParam.class)) {
+              p.getType().cast(httpServletRequest.getParameterMap().get(p.getAnnotation(QueryParam.class).value()));
+        } else if (p.isAnnotationPresent(HeaderParam.class)) {
           final String headerVal =
-              httpServletRequest.getHeader(p.getAnnotation(RestHeaderParam.class).value());
+              httpServletRequest.getHeader(p.getAnnotation(HeaderParam.class).value());
           //TODO check type.. don't cast.
           methodArgs[i] = p.getType().cast(headerVal);
         } else if (p.getType() == HttpServletRequest.class) {
           methodArgs[i] = httpServletRequest;
         } else if (p.getType() == HttpServletResponse.class) {
           methodArgs[i] = httpServletResponse;
-        } else if (method.isAnnotationPresent(RestPost.class)
-                  || method.isAnnotationPresent(RestPut.class)){
+        } else if (method.isAnnotationPresent(POST.class)
+                  || method.isAnnotationPresent(PUT.class)){
           Class<?> parameterType = p.getType();
           try {
             //TODO Clean up and handler more deserializers
@@ -151,14 +158,14 @@ public class RestApiEndpoint extends RegistryBasedServlet {
     }
 
     private void buildPathParamsMap() {
-      final RestPath restPath;
-      if (method.isAnnotationPresent(RestPath.class)) {
-        restPath = method.getAnnotation(RestPath.class);
+      final Path restPath;
+      if (method.isAnnotationPresent(Path.class)) {
+        restPath = method.getAnnotation(Path.class);
       } else {
         return;
       }
 
-      final String restPathValue = restPath.path();
+      final String restPathValue = restPath.value();
       final String pathInfo = httpServletRequest.getPathInfo();
 
       if (pathInfo == null || pathInfo.isEmpty()
@@ -193,10 +200,10 @@ public class RestApiEndpoint extends RegistryBasedServlet {
   RestApiEndpoint(GridRegistry registry) {
     super(registry);
 
-    getMethods = reflectMethods(RestGet.class);
-    postMethods = reflectMethods(RestPost.class);
-    deleteMethods = reflectMethods(RestDelete.class);
-    putMethods = reflectMethods(RestPut.class);
+    getMethods = reflectMethods(GET.class);
+    postMethods = reflectMethods(POST.class);
+    deleteMethods = reflectMethods(DELETE.class);
+    putMethods = reflectMethods(PUT.class);
   }
 
   @Override
@@ -249,29 +256,49 @@ public class RestApiEndpoint extends RegistryBasedServlet {
     try {
       Object invokeResponse = details.method.invoke(this, details.methodArgs);
 
-      if (details.method.getReturnType() == RestResponse.class) {
-        RestResponse restResponse = (RestResponse) invokeResponse;
-        if (restResponse.getStatus() == 500) {
+//      if (details.method.getReturnType() == RestResponse.class) {
+//        RestResponse restResponse = (RestResponse) invokeResponse;
+//        if (restResponse.getStatus() == 500) {
+//          details.httpServletResponse.sendError(500);
+//          return;
+//        }
+//        details.httpServletResponse.setContentType(restResponse.getContentType());
+//        details.httpServletResponse.setCharacterEncoding(restResponse.getEncoding());
+//        details.httpServletResponse.setStatus(restResponse.getStatus());
+//        restResponse.getHeaders()
+//            .forEach(
+//                (k,v) -> details.httpServletResponse.addHeader(k, v)
+//            );
+//
+//        // TODO this assumes a json response
+//        details.httpServletResponse.getWriter().print(new GsonBuilder().setPrettyPrinting().create()
+//                                       .toJson(restResponse.getEntity()));
+//      } else
+        if (details.method.getReturnType() == Response.class) {
+        Response restResponse = (Response) invokeResponse;
+        if (restResponse.getStatus() == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
           details.httpServletResponse.sendError(500);
           return;
         }
-        details.httpServletResponse.setContentType(restResponse.getContentType());
-        details.httpServletResponse.setCharacterEncoding(restResponse.getEncoding());
+//        details.httpServletResponse.setContentType(restResponse.);
+//        details.httpServletResponse.setCharacterEncoding(restResponse.getEncoding());
         details.httpServletResponse.setStatus(restResponse.getStatus());
-        restResponse.getHeaders()
-            .forEach(
-                (k,v) -> details.httpServletResponse.addHeader(k, v)
-            );
+//        restResponse.getHeaders()
+//            .forEach(
+//                (k,v) -> details.httpServletResponse.addHeader(k, v)
+//            );
 
         // TODO this assumes a json response
         details.httpServletResponse.getWriter().print(new GsonBuilder().setPrettyPrinting().create()
-                                       .toJson(restResponse.getEntity()));
-      } else {
+                                                          .toJson(restResponse.getEntity()));
+      }
+      else {
         details.httpServletResponse.sendError(500, "Unhandled return type " + details.method.getReturnType() + " for method.");
       }
 
     } catch (IllegalAccessException | InvocationTargetException | RuntimeException e) {
-      throw new GridException(e.getMessage());
+      e.printStackTrace();
+//      throw new GridException(e.getMessage());
     } finally {
       details.httpServletResponse.getWriter().close();
     }
@@ -289,28 +316,23 @@ public class RestApiEndpoint extends RegistryBasedServlet {
       return Collections.emptyMap();
     }
 
-    // if there is only one method of the type (GET, POST, etc)
-    // it does not have to define a RestPath
-    if (methods.size() == 1) {
-      Method m = methods.get(0);
-      RestPath rp = m.getAnnotation(RestPath.class);
-        return (rp == null) ?
-               ImmutableMap.of("", m) :
-               ImmutableMap.of(rp.path(), m);
-    }
-
     // go through all the methods and collect them.
     // any two or methods that use the same path will
     // result in only one being used.
     return methods
         .stream()
-        .filter(m -> m.getAnnotation(RestPath.class) != null)
         .collect(Collectors.toMap(
-            a -> a.getAnnotation(RestPath.class).path()
-                .trim()
-                .toLowerCase()
-                .replaceAll("^/", ""),
-            a -> a
+            m -> {
+              // Path is optional. Defaults to "" when not specified.
+              if (m.isAnnotationPresent(Path.class)) {
+                return m.getAnnotation(Path.class)
+                    .value()
+                    .toLowerCase()
+                    .replaceAll("^/", "");
+              }
+              return "";
+            },
+            m -> m
         ));
   }
 

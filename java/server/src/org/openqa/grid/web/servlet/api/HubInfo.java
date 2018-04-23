@@ -24,15 +24,19 @@ import org.openqa.grid.internal.RemoteProxy;
 
 import java.net.URL;
 
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.core.Response;
+
 /**
  * Intended to be a replacement for the so called {@link org.openqa.grid.web.servlet.HubStatusServlet}
  */
-@RestPath(path = "hub",
-    description = "Returns configuration and proxy information of the hub.")
+@Path("hub")
+@ApiDoc("Returns configuration and proxy information of the hub.")
 public class HubInfo extends RestApiEndpoint {
 
-  @RestGet
-  public RestResponse getHubInfo() {
+  @GET
+  public Response getHubInfo() {
     JsonObject hubData = new JsonObject();
     hubData.add("configuration", getRegistry().getConfiguration().toJson());
     hubData.add("nodes", proxies());
@@ -45,9 +49,7 @@ public class HubInfo extends RestApiEndpoint {
     hubData.add("slotCounts", getSlotCounts());
     hubData.addProperty( "success", true);
 
-    return new RestResponse()
-        .setEntity(hubData)
-        .ok();
+    return Response.ok(hubData).build();
   }
 
   private String registrationUrl() {

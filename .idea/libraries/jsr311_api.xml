@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="jsr311-api">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/third_party/java/jsr311-api" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="file://$PROJECT_DIR$/third_party/java/jsr311-api" />
+    </SOURCES>
+    <jarDirectory url="file://$PROJECT_DIR$/third_party/java/jsr311-api" recursive="false" />
+    <jarDirectory url="file://$PROJECT_DIR$/third_party/java/jsr311-api" recursive="false" type="SOURCES" />
+  </library>
+</component>

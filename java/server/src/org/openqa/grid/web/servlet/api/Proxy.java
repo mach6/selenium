@@ -28,59 +28,71 @@ import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.internal.utils.configuration.GridNodeConfiguration;
 import org.openqa.selenium.remote.CapabilityType;
 
-import java.util.Collections;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-@RestPath(path = "proxies",
-    description = "Returns configuration and capability information for proxies connected to the hub.")
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.core.Response;
+
+@Path("proxies")
+@ApiDoc("Returns configuration and capability information for proxies connected to the hub.")
 public class Proxy extends RestApiEndpoint {
 
   //TODO experimental
-  @RestPost
-  @RestPath(description = "Add a proxy.")
-  public RestResponse addProxy(GridNodeConfiguration proxyConfig) {
+  @POST
+  @ApiDoc("Add a proxy.")
+  public Response addProxy(GridNodeConfiguration proxyConfig) throws URISyntaxException {
     RemoteProxy proxy = BaseRemoteProxy.getNewInstance(new RegistrationRequest(proxyConfig), getRegistry());
     getRegistry().add(proxy);
 
-    return new RestResponse()
-        .setStatus(201);
+    return Response.created(new URI(proxy.getId())).build();
   }
 
   //TODO experimental
-  @RestDelete
-  @RestPath(path = "{id}", description = "Delete a proxy by its id.")
-  public RestResponse deleteProxy(@RestPathParam("id") String id) {
+  @DELETE
+  @Path("{id}")
+  @ApiDoc("Delete a proxy by its id.")
+  public Response deleteProxy(@PathParam("id") String id) {
     System.out.println("Deleting proxy " + id);
     RemoteProxy proxy = getRegistry().getProxyById(id);
     getRegistry().removeIfPresent(proxy);
 
-    return new RestResponse()
-        .ok();
+    return Response.ok().build();
   }
 
-  @RestGet
-  @RestPath(description = "Get all proxies.")
-  public RestResponse getProxies() {
-    return new RestResponse()
-        .setEntity(allProxyInfo())
-        .ok();
+  @GET
+  @ApiDoc("Get all proxies.")
+  public Response getProxies() {
+    return Response.ok(allProxyInfo()).build();
   }
 
-  @RestGet
-  @RestPath(path = "{id}", description = "Get a specific proxy using its id.")
-  public RestResponse getProxy(@RestPathParam("id") String proxyId) {
+  @GET
+  @Path("{id}")
+  @ApiDoc("Get a specific proxy using its id.")
+  public Response getProxy(@PathParam("id") String proxyId) {
     Map<String, Object> proxyInfo = Maps.newHashMap();
 
     if (proxyId == null || proxyId.trim().isEmpty()) {
-      return new RestResponse().error();
+      //the server should not pass null or empty
+      return Response.serverError().build();
     }
 
     RemoteProxy proxy = getRegistry().getProxyById(proxyId);
     if (proxy == null) {
       //Maybe user gave only the node ip and port
       proxy = getRegistry().getProxyById(getProxyId(proxyId));
+    }
+
+    // time to give up
+    if (proxy == null) {
+      return Response.noContent().build();
     }
 
     proxyInfo.put("config", proxy.getConfig().toJson());
@@ -100,7 +112,7 @@ public class Proxy extends RestApiEndpoint {
       }
       JsonObject session = new JsonObject();
       String key = CapabilityType.BROWSER_NAME;
-      String browser = (String)slot.getSession().getRequestedCapabilities().get(key);
+      String browser = (String) slot.getSession().getRequestedCapabilities().get(key);
       if (browser != null) {
         session.addProperty(key, browser);
       }
@@ -110,9 +122,7 @@ public class Proxy extends RestApiEndpoint {
     proxyInfo.put("sessions", sessions);
     proxyInfo.put("slotUsage", ProxyUtil.getDetailedSlotUsage(proxy));
 
-    return new RestResponse()
-        .setEntity(proxyInfo)
-        .ok();
+    return Response.ok(proxyInfo).build();
   }
 
   private List<JsonObject> allProxyInfo() {

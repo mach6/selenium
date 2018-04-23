@@ -25,7 +25,9 @@ import java.lang.annotation.Target;
 
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.PARAMETER)
-public @interface RestHeaderParam {
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface ApiDoc {
   String value() default "";
+
+  String usage() default "";
 }

@@ -27,22 +27,27 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-@RestPath(path = "sessions",
-    description = "Returns details for sessions connected to the hub.")
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.core.Response;
+
+@Path("sessions")
+@ApiDoc("Returns details for sessions connected to the hub.")
 public class Sessions extends RestApiEndpoint {
 
-  @RestGet
-  @RestPath(description = "Get all sessions")
-  public RestResponse getSessions() {
-    return new RestResponse()
-        .setEntity(getAllSessions())
-        .ok();
+  @GET
+  @ApiDoc("Get all sessions")
+  public Response getSessions() {
+    return NonConformingRestResponse
+//        .setEntity(getAllSessions())
+        .ok(getAllSessions()).build();
   }
 
-  @RestGet
-  @RestPath(path = "{id}",
-      description = "Get a specific session using its id.")
-  public RestResponse getSession(@RestPathParam("id") String sessionId) {
+  @GET
+  @Path("{id}")
+  @ApiDoc("Get a specific session using its id.")
+  public Response getSession(@PathParam("id") String sessionId) {
      Map<String, Object> sessionInfo = Collections.emptyMap();
 
     TestSession session = getRegistry().getActiveSessions()
@@ -52,8 +57,8 @@ public class Sessions extends RestApiEndpoint {
         .orElse(null);
 
     if (session == null) {
-      return new RestResponse()
-        .setStatus(404);
+      return NonConformingRestResponse.status(404).build();
+//          .notFound();
     }
 
     sessionInfo.put("isOrphaned", session.isOrphaned());
@@ -70,9 +75,9 @@ public class Sessions extends RestApiEndpoint {
     proxy.addProperty("nodeId", session.getSlot().getProxy().getId());
     sessionInfo.put("proxy", proxy);
 
-    return new RestResponse()
-      .setEntity(sessionInfo)
-      .ok();
+    return  NonConformingRestResponse
+//      .setEntity(sessionInfo)
+      .ok(sessionInfo).build();
   }
 
   private Map<String, JsonObject> getAllSessions() {
